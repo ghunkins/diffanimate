@@ -1,2 +1,3 @@
-# diffusers-animatediff
-Diffusers AnimateDiff
+# DiffAnimate
+
+Diffusers Animation Library
