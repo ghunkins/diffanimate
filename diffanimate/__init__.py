@@ -4,4 +4,4 @@
 #  / // // // _// _// __ |/    // // /|_/ / __ |/ / / _/  
 # /____/___/_/ /_/ /_/ |_/_/|_/___/_/  /_/_/ |_/_/ /___/  
 
-DIFFANIMATE = 1
+from .unet import UNet3DConditionModel
