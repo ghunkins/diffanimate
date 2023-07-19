@@ -9,11 +9,23 @@ from setuptools import setup, find_packages
 
 setup(
     name='diffanimate',
-    version='0.1',
+    version='0.1.0',
     url='https://github.com/ghunkins/diffanimate',
     author='Gregory D. Hunkins',
     author_email='greg@mage.space',
     description='Diffusers Animation',
     packages=find_packages(),    
-    install_requires=[],
+    install_requires=[
+        "torch",
+        "torchvision",
+        "torchaudio",
+        "diffusers",
+        "transformers",
+        "accelerate",
+        "xformers",
+        "safetensors",
+        "compel",
+        "einops",
+        "omegaconf",
+    ],
 )
