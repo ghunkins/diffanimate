@@ -1,7 +1,7 @@
 # Adapted from https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/unet_2d_condition.py
 
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, Dict
 
 import os
 import json
@@ -12,7 +12,7 @@ import torch.nn as nn
 import torch.utils.checkpoint
 
 from diffusers.configuration_utils import ConfigMixin, register_to_config
-from diffusers import ModelMixin
+from diffusers import ModelMixin, UNet2DConditionModel
 from diffusers.utils import BaseOutput, logging
 from diffusers.models.embeddings import TimestepEmbedding, Timesteps
 from .unet_blocks import (
@@ -449,49 +449,72 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
         return UNet3DConditionOutput(sample=sample)
 
     @classmethod
-    def from_pretrained_2d(cls, pretrained_model_path, subfolder=None, unet_additional_kwargs=None):
-        if subfolder is not None:
-            pretrained_model_path = os.path.join(pretrained_model_path, subfolder)
-        print(f"loaded temporal unet's pretrained weights from {pretrained_model_path} ...")
+    def from_unet_2d_and_motion_module(
+        cls,
+        unet: UNet2DConditionModel,
+        motion_module_state_dict: Dict,
+        unet_additional_kwargs: Optional[Dict] = None,
+    ):
+        config = dict(unet.config)
 
-        config_file = os.path.join(pretrained_model_path, 'config.json')
-        if not os.path.isfile(config_file):
-            raise RuntimeError(f"{config_file} does not exist")
-        with open(config_file, "r") as f:
-            config = json.load(f)
-        config["_class_name"] = cls.__name__
-        config["down_block_types"] = [
-            "CrossAttnDownBlock3D",
-            "CrossAttnDownBlock3D",
-            "CrossAttnDownBlock3D",
-            "DownBlock3D"
-        ]
-        config["up_block_types"] = [
-            "UpBlock3D",
-            "CrossAttnUpBlock3D",
-            "CrossAttnUpBlock3D",
-            "CrossAttnUpBlock3D"
-        ]
-        if "mid_block_type" in config:
-            config["mid_block_type"] = "UNetMidBlock3DCrossAttn"
+        # base config overrides
+        unet_base_kwargs = {
+            '_class_name': cls.__name__,
+            'down_block_types': [
+                "CrossAttnDownBlock3D",
+                "CrossAttnDownBlock3D",
+                "CrossAttnDownBlock3D",
+                "DownBlock3D",
+            ],
+            'up_block_types': [
+                "UpBlock3D",
+                "CrossAttnUpBlock3D",
+                "CrossAttnUpBlock3D",
+                "CrossAttnUpBlock3D",
+            ],
+            'mid_block_type': "UNetMidBlock3DCrossAttn",
+            'unet_use_cross_frame_attention': False,
+            'unet_use_temporal_attention': False,
+            'use_motion_module': True,
+            'motion_module_resolutions': [1, 2, 4, 8],
+            'motion_module_mid_block': False,
+            'motion_module_decoder_only': False,
+            'motion_module_type': 'Vanilla',
+            'motion_module_kwargs': {
+                'num_attention_heads': 8,
+                'num_transformer_block': 1,
+                'attention_block_types': ['Temporal_Self', 'Temporal_Self'],
+                'temporal_position_encoding': True,
+                'temporal_position_encoding_max_len': 24,
+                'temporal_attention_dim_div': 1
+            },
+        }
 
-        from diffusers.utils import WEIGHTS_NAME
-        model = cls.from_config(config, **unet_additional_kwargs)
-        model_file = os.path.join(pretrained_model_path, WEIGHTS_NAME)
-        safetensors_file = model_file.replace('.bin', '.safetensors')
-        if not os.path.isfile(model_file) and not os.path.isfile(safetensors_file):
-            raise RuntimeError(f"{model_file} or safetensors variant does not exist")
-        if os.path.isfile(safetensors_file):
-            from safetensors.torch import load_file
-            state_dict = load_file(safetensors_file, device="cpu")
-        else:
-            state_dict = torch.load(model_file, map_location="cpu")
+        # additional config overrides
+        unet_additional_kwargs = unet_additional_kwargs or dict()
 
-        m, u = model.load_state_dict(state_dict, strict=False)
-        print(f"### missing keys: {len(m)}; \n### unexpected keys: {len(u)};")
-        # print(f"### missing keys:\n{m}\n### unexpected keys:\n{u}\n")
+        # combine to finalize config
+        config = {
+            **config,
+            **unet_base_kwargs,
+            **unet_additional_kwargs,
+        }
         
-        params = [p.numel() if "temporal" in n else 0 for n, p in model.named_parameters()]
-        print(f"### Temporal Module Parameters: {sum(params) / 1e6} M")
-        
+        # instantiate
+        model = cls.from_config(config)
+
+        # load state from unet
+        model.load_state_dict(
+            unet.state_dict(),
+            strict=False,            
+        )
+
+        # load state from motion module
+        model.load_state_dict(
+            motion_module_state_dict,
+            strict=False,
+        )
+
+        # cast and return
+        model = model.to(unet.dtype)
         return model
