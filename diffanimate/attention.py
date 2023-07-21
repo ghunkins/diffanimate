@@ -226,7 +226,7 @@ class BasicTransformerBlock(nn.Module):
             nn.init.zeros_(self.attn_temp.to_out[0].weight.data)
             self.norm_temp = AdaLayerNorm(dim, num_embeds_ada_norm) if self.use_ada_layer_norm else nn.LayerNorm(dim)
 
-    def set_use_memory_efficient_attention_xformers(self, use_memory_efficient_attention_xformers: bool, **kwargs):
+    def set_use_memory_efficient_attention_xformers(self, use_memory_efficient_attention_xformers: bool, *args, **kwargs):
         if not is_xformers_available():
             print("Here is how to install it")
             raise ModuleNotFoundError(
