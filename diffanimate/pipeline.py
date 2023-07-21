@@ -117,6 +117,9 @@ class DiffAnimatePipeline(TextToVideoSDPipeline):
                 self.mask_image = kwargs.pop('mask_image')
             else:
                 self.mask_image = None
+
+            kwargs['width'] = self.origin_image.width
+            kwargs['height'] = self.origin_image.height
         else:
             self.origin_image = None
             self.image = None
