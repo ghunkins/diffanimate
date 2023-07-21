@@ -5,3 +5,4 @@
 # /____/___/_/ /_/ /_/ |_/_/|_/___/_/  /_/_/ |_/_/ /___/  
 
 from .unet import UNet3DConditionModel
+from .pipeline import DiffAnimatePipeline
