@@ -6,7 +6,7 @@
 #     
 import math
 from typing import Optional
-from diffusers.torch_utils import randn_tensor
+from diffusers.utils.torch_utils import randn_tensor
 from diffusers.image_processor import VaeImageProcessor
 from diffusers import TextToVideoSDPipeline
 
